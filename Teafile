@@ -33,11 +33,8 @@
     "clientName": "client"
   },
   "cpp":  {
-    "packageInfo": {
-      "git": {
-        "scope": "alibabacloud-sdk-cpp",
-        "project": "dara-fileform"
-      }
-    }
+    "namespace": "Darabonba",
+    "header": "darabonba/file_form.hpp",
+		"className": "FileForm"
   }
 }

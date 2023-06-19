@@ -8,6 +8,8 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+set(CMAKE_INSTALL_PREFIX "${PROJECT_SOURCE_DIR}/${PROJECT_NAME}_build")
+SET(CMAKE_FIND_LIBRARY_SUFFIXES "${CMAKE_FIND_LIBRARY_SUFFIXES}" "_d.dylib")
 message("C++ compiler flags: ${CMAKE_CXX_FLAGS}")
 
 if (CMAKE_CXX_COMPILER_LOADED)
@@ -21,11 +23,10 @@ endif ()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Target set up >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> #
-add_library(${PROJECT_NAME} SHARED "")
 set(headers
         include/darabonba/file_form.hpp)
-target_sources(${PROJECT_NAME}
-        PRIVATE
+add_library(${PROJECT_NAME}
+        SHARED
         src/file_form.cpp
         ${headers})
 target_include_directories(${PROJECT_NAME}
@@ -58,9 +59,10 @@ endif ()
 
 # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< External set up >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> #
 add_subdirectory(external)
-find_package(Boost REQUIRED COMPONENTS random system thread filesystem chrono atomic date_time regex)
-find_library(CPPREST_LIB cpprest)
-target_link_libraries(${PROJECT_NAME} PRIVATE crypto darabonba_core ${CPPREST_LIB})
+find_library(CURL_LIB curl)
+find_library(CORE_LIB darabonba_core ${CMAKE_CURRENT_SOURCE_DIR}/deps/lib)
+#message(STATUS "sadfasdf ${darabonba_core_LIBRARIES}")
+target_link_libraries(${PROJECT_NAME} ${CURL_LIB} ${CORE_LIB})
 
 if (ENABLE_UNIT_TESTS)
     target_include_directories(tests_darabonba_file_form

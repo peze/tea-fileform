@@ -1,77 +1,64 @@
 // This file is auto-generated, don't edit it. Thanks.
 
 #include <darabonba/file_form.hpp>
-#include <boost/any.hpp>
 #include <iostream>
 #include <map>
-#include <boost/random.hpp>
 
-
-#define MIN 10000000000000
-#define MAX 99999999999999
 using namespace std;
 
-string Darabonba_FileForm::Client::getBoundary() {
-  typedef boost::uniform_int<long long int> NumberDistribution;
-  typedef boost::mt19937 RandomNumberGenerator;
-  typedef boost::variate_generator<RandomNumberGenerator&,NumberDistribution> Generator;
-
-  NumberDistribution distribution(MIN, MAX);
-  RandomNumberGenerator generator;
-  Generator numberGenerator(generator, distribution);
-  generator.seed(time(nullptr)); // seed with the current time
-  long long int A=numberGenerator();
-  return to_string(A);
+char asciiToLower(char in) {
+  if (in <= 'Z' && in >= 'A')
+    return in - ('Z' - 'z');
+  return in;
 }
 
-shared_ptr<Darabonba_FileForm::FileFormStream> Darabonba_FileForm::Client::toFileForm(shared_ptr<map<string, boost::any>> form,
-                                                                                      shared_ptr<string> boundary) {
-  if (boundary && form) {
-    return make_shared<Darabonba_FileForm::FileFormStream>(*form, *boundary);
+Darabonba::FileField::FileField(const json &map) : Darabonba::Model() {
+  validate(map);
+  from_json(map, *this);
+}
+
+string Darabonba::FileForm::getBoundary() {
+  return Darabonba::Core::uuid();
+}
+
+shared_ptr<Darabonba::FileFormStream> Darabonba::FileForm::toFileForm(const json &form, const string &boundary) {
+  return shared_ptr<Darabonba::FileFormStream>(new FileFormStream(form));
+}
+
+struct curl_slist* Darabonba::FileFormStream::headerChecker(struct curl_slist* list) {
+  struct curl_slist* head = list;
+  while(head != nullptr) {
+    string data = head->data;
+    transform(data.begin(), data.end(), data.begin(), asciiToLower);
+    if(data.rfind("content-type", 0) == 0) {
+      head->data = "content-type: multipart/form-data";
+    }
+    head = head->next;
   }
-  return make_shared<Darabonba_FileForm::FileFormStream>();
+  return list;
 }
 
-bool Darabonba_FileForm::FileFormStream::empty() {
-  return _form.empty();
-}
+void Darabonba::FileFormStream::read(CURL* curl) {
+  struct curl_httppost *lastPtr = NULL;
 
-string Darabonba_FileForm::FileFormStream::read() {
-  vector<string> stream_keys;
-  vector<string> str_keys;
-  for (const auto& i : _form) {
-    if (typeid(Darabonba_FileForm::FileField) == i.second.type()) {
-      stream_keys.push_back(i.first);
-    } else {
-      str_keys.push_back(i.first);
+  for (json::iterator it = _form.begin(); it != _form.end(); ++it) {
+    try {
+      Darabonba::FileField file = it.value().get<Darabonba::FileField>();
+      curl_formadd(&_formPost,
+                   &lastPtr,
+                   CURLFORM_COPYNAME, it.key().c_str(),
+                   CURLFORM_FILE, file.content().c_str(),
+                   CURLFORM_CONTENTTYPE, file.contentType().c_str(),
+                   CURLFORM_END);
+    } catch (exception ex) {
+      curl_formadd(&_formPost,
+                   &lastPtr,
+                   CURLFORM_COPYNAME, it.key().c_str(),
+                   CURLFORM_COPYCONTENTS, it.value().dump().c_str(),
+                   CURLFORM_END);
     }
   }
 
-  sort(str_keys.begin(), str_keys.end());
-  string form_str;
-  for (const auto& k : str_keys) {
-    if (typeid(string) == _form[k].type()) {
-      string value = boost::any_cast<string>(_form[k]);
-      form_str.append("--")
-      .append(_boundary)
-      .append("\r\nContent-Disposition: form-data; name=\"")
-      .append(k).append("\"\r\n\r\n").append(value)
-      .append("\r\n");
-    }
-  }
 
-  for (const auto& k : stream_keys) {
-    if (typeid(Darabonba_FileForm::FileField) == _form[k].type()) {
-      Darabonba_FileForm::FileField file_field = boost::any_cast<Darabonba_FileForm::FileField>(_form[k]);
-      string content = file_field.content->read();
-      form_str.append("--")
-      .append(_boundary)
-      .append("\r\nContent-Disposition: form-data; name=\"")
-      .append(k).append("\"; filename=\"").append(*file_field.filename)
-      .append("\"\r\nContent-Type: ").append(*file_field.contentType)
-      .append("\r\n\r\n").append(content).append("\r\n");
-    }
-  }
-  form_str.append("--").append(_boundary).append("--\r\n");
-  return form_str;
+  curl_easy_setopt(curl, CURLOPT_HTTPPOST, _formPost);
 }

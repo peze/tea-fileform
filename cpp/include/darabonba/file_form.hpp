@@ -1,95 +1,123 @@
 // This file is auto-generated, don't edit it. Thanks.
-
-#ifndef DARABONBA_FILEFORM_H_
-#define DARABONBA_FILEFORM_H_
-
-#include <boost/any.hpp>
-#include <boost/throw_exception.hpp>
+#ifndef DARABONBA_FILE_FORM_HPP_H_
+#define DARABONBA_FILE_FORM_HPP_H_
 #include <darabonba/core.hpp>
-#include <iostream>
-#include <map>
-
 using namespace std;
+using json = nlohmann::json;
+namespace Darabonba {
 
-namespace Darabonba_FileForm {
-class FileField : public Darabonba::Model {
-public:
-  FileField() {}
-  explicit FileField(const std::map<string, boost::any> &config) : Darabonba::Model(config) {
-    fromMap(config);
+#define FILE_FORM_ERROR(name) \
+  if(j.find(#name) != j.end() || j[#name].is_null()) {             \
+    Error("##name is empty");              \
+  }
+  /**
+   * The model is for genrating stream
+   */
+  class FileField : public Darabonba::Model {
+  public:
+    FileField() {}
+    FileField(const json &map);
+    friend void to_json(json& j, const FileField& p){
+      DARABONBA_JSON_TO(filename, filename)
+      DARABONBA_JSON_TO(contentType, contentType)
+      DARABONBA_JSON_TO(content, content)
+
+    }
+    friend void from_json(const json& j, FileField& p){
+      FILE_FORM_ERROR(filename)
+      FILE_FORM_ERROR(contentType)
+      FILE_FORM_ERROR(content)
+      DARABONBA_JSON_FROM(filename, filename, string)
+      DARABONBA_JSON_FROM(contentType, contentType, string)
+      DARABONBA_JSON_FROM(content, content, string)
+    }
+
+    json toMap(){
+      json map;
+      to_json(map, *this);
+      return map;
+    };
+    void validate(const json &map) {};
+
+    string filename() const {
+      if(_filename) {
+        return *_filename;
+      }
+      return "";
+    }
+    void setFilename(string filename) {
+      _filename = make_shared<string> (filename);
+    }
+    string contentType() const {
+      if(_contentType) {
+        return *_contentType;
+      }
+      return "";
+    }
+    void setContentType(string contentType) {
+      _contentType = make_shared<string> (contentType);
+    }
+    string content() const {
+      if(_content) {
+        return *_content;
+      }
+      return "";
+    }
+    void setContent(string content) {
+      _content = make_shared<string> (content);
+    }
+    ~FileField() = default;
+  private:
+    // the name of the file
+    shared_ptr<string> _filename;
+
+    // the MIME of the file
+    shared_ptr<string> _contentType;
+
+    // the content of the file
+    shared_ptr<string> _content;
+
   };
 
-  void validate() override {
-    if (!filename) {
-      BOOST_THROW_EXCEPTION(boost::enable_error_info(std::runtime_error("filename is required.")));
+  class FileFormStream: public RequestBody {
+  public:
+    FileFormStream()=default;
+    ~FileFormStream() {
+      curl_formfree(_formPost);
+    };
+    FileFormStream(const json& form):
+        _form(form), RequestBody(){};
+    void read(CURL* curl);
+    struct curl_slist* headerChecker(struct curl_slist* list);
+  private:
+    json _form;
+    struct curl_httppost* _formPost = NULL;
+  };
+
+
+  class FileForm {
+  public:
+    FileForm() {}
+
+    ~FileForm() {
     }
-    if (!contentType) {
-      BOOST_THROW_EXCEPTION(boost::enable_error_info(std::runtime_error("contentType is required.")));
-    }
-    if (!content) {
-      BOOST_THROW_EXCEPTION(boost::enable_error_info(std::runtime_error("content is required.")));
-    }
-  }
+    /**
+     * Gets a boundary string
+     * @return the random boundary string
+     */
+    static string getBoundary();
 
-  map<string, boost::any> toMap() override {
-    map<string, boost::any> res;
-    if (filename) {
-      res["filename"] = boost::any(*filename);
-    }
-    if (contentType) {
-      res["contentType"] = boost::any(*contentType);
-    }
-    if (content) {
-      res["content"] = boost::any(*content);
-    }
-    return res;
-  }
+    /**
+     * Give a form and boundary string, wrap it to a readable stream
+     * @param form The form map
+     * @param boundary the boundary string
+     * @return the readable from file form
+     */
+    static shared_ptr<FileFormStream> toFileForm(const json &form, const string &boundary);
 
-  void fromMap(map<string, boost::any> m) override {
-    if (m.find("filename") != m.end()) {
-      filename = make_shared<string>(boost::any_cast<string>(m["filename"]));
-    }
-    if (m.find("contentType") != m.end()) {
-      contentType = make_shared<string>(boost::any_cast<string>(m["contentType"]));
-    }
-    if (m.find("content") != m.end()) {
-      content = make_shared<Darabonba::Stream>(boost::any_cast<Darabonba::Stream>(m["content"]));
-    }
-  }
-
-  shared_ptr<string> filename{};
-  shared_ptr<string> contentType{};
-  shared_ptr<Darabonba::Stream> content{};
-
-  ~FileField() = default;
-};
+  };
 
 
-class FileFormStream: public Darabonba::Stream {
-public:
-  FileFormStream()=default;
-  ~FileFormStream()=default;
-  FileFormStream(map<string, boost::any> form,
-                      string boundary){
-    _form = std::move(form);
-    _boundary = std::move(boundary);
-  }
-  bool empty() override;
-  string read() override;
-private:
-  string _boundary;
-  map<string, boost::any> _form;
-};
 
-
-class Client {
-public:
-  static string getBoundary();
-  static shared_ptr<FileFormStream> toFileForm(shared_ptr<map<string, boost::any>> form, shared_ptr<string> boundary);
-
-  Client() {};
-  ~Client() {};
-};
-} // namespace Darabonba_FileForm
-
+}
 #endif

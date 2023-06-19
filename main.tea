@@ -7,7 +7,7 @@
  */
 model FileField {
   filename: string(description='the name of the file',example='a.txt',default=''),
-  contentType: string(description='the MIME of the file',example='txt',default=''),
+  contentType: [ string ](description='the MIME of the file',example='txt',default=''),
   content: readable(description='the content of the file')
 }
 
